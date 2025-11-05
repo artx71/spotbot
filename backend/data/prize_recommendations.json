@@ -1,0 +1,106 @@
+{
+  "recommendations": [
+    {
+      "id": "rec_001",
+      "prize_pool_range": "20000-30000",
+      "theme": "Artificial Intelligence",
+      "allocations": {
+        "first": 15000,
+        "second": 7000,
+        "third": 3000,
+        "total": 25000
+      },
+      "anonymized_source": "AI Innovation Challenge 2024",
+      "metadata": {
+        "participants": 250,
+        "duration_days": 48,
+        "success_rate": 0.85
+      }
+    },
+    {
+      "id": "rec_002",
+      "prize_pool_range": "15000-25000",
+      "theme": "Artificial Intelligence",
+      "allocations": {
+        "first": 12000,
+        "second": 6000,
+        "third": 2000,
+        "total": 20000
+      },
+      "anonymized_source": "AI Innovation Challenge 2024",
+      "metadata": {
+        "participants": 180,
+        "duration_days": 48,
+        "success_rate": 0.82
+      }
+    },
+    {
+      "id": "rec_003",
+      "prize_pool_range": "30000-40000",
+      "theme": "Healthcare & Medical",
+      "allocations": {
+        "first": 20000,
+        "second": 10000,
+        "third": 5000,
+        "total": 35000
+      },
+      "anonymized_source": "Healthcare Innovation Summit",
+      "metadata": {
+        "participants": 320,
+        "duration_days": 60,
+        "success_rate": 0.88
+      }
+    },
+    {
+      "id": "rec_004",
+      "prize_pool_range": "20000-30000",
+      "theme": "Financial Technology",
+      "allocations": {
+        "first": 18000,
+        "second": 8000,
+        "third": 4000,
+        "total": 30000
+      },
+      "anonymized_source": "FinTech Disruption Challenge",
+      "metadata": {
+        "participants": 220,
+        "duration_days": 48,
+        "success_rate": 0.83
+      }
+    },
+    {
+      "id": "rec_005",
+      "prize_pool_range": "15000-20000",
+      "theme": "Climate & Sustainability",
+      "allocations": {
+        "first": 12000,
+        "second": 6000,
+        "third": 2000,
+        "total": 20000
+      },
+      "anonymized_source": "ClimateTech Hackathon",
+      "metadata": {
+        "participants": 180,
+        "duration_days": 72,
+        "success_rate": 0.80
+      }
+    }
+  ],
+  "ratios": {
+    "small": {
+      "first": 0.60,
+      "second": 0.30,
+      "third": 0.10
+    },
+    "medium": {
+      "first": 0.50,
+      "second": 0.30,
+      "third": 0.20
+    },
+    "large": {
+      "first": 0.45,
+      "second": 0.35,
+      "third": 0.20
+    }
+  }
+}
