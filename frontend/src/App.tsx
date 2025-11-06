@@ -8,15 +8,13 @@ function App() {
   const [loading, setLoading] = useState<boolean>(false)
   const [hackathonData, setHackathonData] = useState<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const userId = 'default_user' // In production, this would come from auth
+  const userId = 'default_user'
 
   useEffect(() => {
-    // Load conversation history on mount
     loadHistory()
   }, [])
 
   useEffect(() => {
-    // Auto-scroll to bottom when messages update
     scrollToBottom()
   }, [messages])
 
@@ -30,7 +28,6 @@ function App() {
       if (data.history && data.history.length > 0) {
         setMessages(data.history)
       } else {
-        // Initial welcome message
         setMessages([{
           role: 'assistant',
           content: "Welcome to Spot, your AI-powered hackathon assistant! 👋\n\nI'm here to help you create your custom hackathon and landing page. Let's start by telling me about your hackathon idea - what theme or focus area are you interested in?"
@@ -48,18 +45,13 @@ function App() {
   const handleSendMessage = async (message: string) => {
     if (!message.trim()) return
 
-    // Add user message immediately
     const userMessage: Message = { role: 'user', content: message }
     setMessages((prev: Message[]) => [...prev, userMessage])
     setLoading(true)
 
     try {
       const data = await sendMessage(message, userId)
-      
-      // Update messages with full history from server
       setMessages(data.history || [])
-      
-      // Check if hackathon data is ready
       if (data.hackathon_data) {
         setHackathonData(data.hackathon_data)
       }
@@ -76,7 +68,6 @@ function App() {
 
   const handleCreateHackathon = async () => {
     if (!hackathonData) {
-      // Try to extract hackathon data from conversation
       const createMessage = "I'm ready to create my hackathon. Please generate the hackathon configuration."
       await handleSendMessage(createMessage)
       return
@@ -101,7 +92,6 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-white">
-      {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div>
@@ -120,7 +110,6 @@ function App() {
         </div>
       </header>
 
-      {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6 bg-gray-50">
         <div className="max-w-5xl mx-auto space-y-4">
           {messages.map((msg, index) => (
@@ -145,7 +134,6 @@ function App() {
         </div>
       </div>
 
-      {/* Chat Input */}
       <div className="bg-white border-t border-gray-200 px-4 py-4">
         <div className="max-w-5xl mx-auto">
           <ChatInput onSendMessage={handleSendMessage} disabled={loading} />

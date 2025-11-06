@@ -1,31 +1,22 @@
-"""
-SpotBot API - FastAPI Backend
-Main API server for SpotBot chat functionality
-"""
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from chat_service import chat_service
 from rag_service import rag_service
+from learning_pipeline import learning_pipeline
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-import atexit
 import logging
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="SpotBot API", version="1.0.0")
-
-# Initialize scheduler for automatic training
 scheduler = BackgroundScheduler()
 
 
 def train_bot():
-    """Training job that reloads mock data"""
     try:
         logger.info("Starting automatic bot training...")
         success = rag_service.train()
@@ -37,43 +28,44 @@ def train_bot():
         logger.error(f"Error during bot training: {e}")
 
 
-# Schedule automatic training every minute
 scheduler.add_job(
     func=train_bot,
-    trigger=CronTrigger(second=0),  # Run every minute at :00 seconds
+    trigger=CronTrigger(second=0),
     id='auto_train_bot',
     name='Automatic Bot Training',
     replace_existing=True
 )
 
-# Start scheduler when app starts
+scheduler.add_job(
+    func=learning_pipeline.run_weekly_learning_job,
+    trigger=CronTrigger(day_of_week="mon", hour=2, minute=0),
+    id='weekly_learning_job',
+    name='Weekly Learning Pipeline',
+    replace_existing=True
+)
+
+
 @app.on_event("startup")
 def startup_event():
-    """Start the scheduler and run initial training"""
     scheduler.start()
-    logger.info("Scheduler started - bot will train automatically every minute")
-    # Run initial training on startup
+    logger.info("Scheduler started - training every minute, weekly learning on Mondays at 2 AM")
     train_bot()
 
 
-# Shutdown scheduler when app stops
 @app.on_event("shutdown")
 def shutdown_event():
-    """Stop the scheduler"""
     scheduler.shutdown()
     logger.info("Scheduler stopped")
 
-# CORS middleware for React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],  # React dev servers
+    allow_origins=["http://localhost:3000", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# Request/Response models
 class ChatMessage(BaseModel):
     message: str
     user_id: Optional[str] = "default_user"
@@ -89,7 +81,6 @@ class HistoryResponse(BaseModel):
     history: List[Dict]
 
 
-# API Endpoints
 @app.get("/")
 def root():
     return {
@@ -105,9 +96,6 @@ def root():
 
 @app.post("/api/spotbot/query", response_model=ChatResponse)
 async def chat_query(message_data: ChatMessage):
-    """
-    Process a chat message and return bot response
-    """
     try:
         result = chat_service.process_message(
             user_id=message_data.user_id or "default_user",
@@ -124,9 +112,6 @@ async def chat_query(message_data: ChatMessage):
 
 @app.get("/api/spotbot/history/{user_id}", response_model=HistoryResponse)
 async def get_history(user_id: str):
-    """
-    Get conversation history for a user
-    """
     try:
         history = chat_service.get_conversation_history(user_id)
         return HistoryResponse(history=history)
@@ -136,9 +121,6 @@ async def get_history(user_id: str):
 
 @app.post("/api/spotbot/clear/{user_id}")
 async def clear_history(user_id: str):
-    """
-    Clear conversation history for a user
-    """
     try:
         chat_service.clear_conversation(user_id)
         return {"message": "Conversation history cleared", "user_id": user_id}
@@ -148,9 +130,6 @@ async def clear_history(user_id: str):
 
 @app.post("/api/spotbot/train")
 async def manual_train():
-    """
-    Manually trigger bot training (reloads mock data)
-    """
     try:
         success = rag_service.train()
         return {
@@ -168,9 +147,6 @@ class CreateHackathonRequest(BaseModel):
 
 @app.post("/api/spotbot/create")
 async def create_hackathon(request: CreateHackathonRequest):
-    """
-    Create a hackathon from draft data
-    """
     try:
         hackathon = chat_service.create_hackathon(
             user_id=request.user_id or "default_user",
@@ -180,6 +156,50 @@ async def create_hackathon(request: CreateHackathonRequest):
             "success": True,
             "hackathon": hackathon,
             "message": f"Hackathon '{hackathon['title']}' created successfully!"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/spotbot/admin/pending-embeddings")
+async def get_pending_embeddings():
+    try:
+        pending = learning_pipeline.get_pending_embeddings()
+        return {
+            "count": len(pending),
+            "embeddings": pending
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ApproveEmbeddingsRequest(BaseModel):
+    embedding_ids: List[str]
+    admin_user_id: str
+
+
+@app.post("/api/spotbot/admin/approve-embeddings")
+async def approve_embeddings(request: ApproveEmbeddingsRequest):
+    try:
+        success = learning_pipeline.approve_embeddings(
+            embedding_ids=request.embedding_ids,
+            admin_user_id=request.admin_user_id
+        )
+        return {
+            "success": success,
+            "message": f"Approved {len(request.embedding_ids)} embeddings"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/spotbot/admin/trigger-learning")
+async def trigger_learning_job():
+    try:
+        success = learning_pipeline.run_weekly_learning_job()
+        return {
+            "success": success,
+            "message": "Learning job completed" if success else "Learning job failed"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

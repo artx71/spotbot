@@ -1,8 +1,3 @@
-"""
-Mock data store for SpotBot MVP
-Contains proprietary hackathon data: titles, challenges, prizes, judges
-"""
-
 MOCK_HACKATHONS = [
     {
         "id": 1,
@@ -136,26 +131,24 @@ MOCK_HACKATHONS = [
     }
 ]
 
-# Prize allocation recommendations based on total prize pool
 PRIZE_RECOMMENDATIONS = {
-    "small": {  # $5k - $15k
+    "small": {
         "first": 0.60,
         "second": 0.30,
         "third": 0.10
     },
-    "medium": {  # $15k - $30k
+    "medium": {
         "first": 0.50,
         "second": 0.30,
         "third": 0.20
     },
-    "large": {  # $30k+
+    "large": {
         "first": 0.45,
         "second": 0.35,
         "third": 0.20
     }
 }
 
-# Timeline recommendations based on hackathon type
 TIMELINE_RECOMMENDATIONS = {
     "sprint": {"days": 24, "description": "Fast-paced 24-hour sprint hackathon"},
     "standard": {"days": 48, "description": "Standard 48-hour weekend hackathon"},
