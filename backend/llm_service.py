@@ -1,20 +1,12 @@
-"""
-LLM Service for formatting responses
-Uses OpenAI to format human-readable outputs
-"""
-
-from typing import Dict, Optional
+from typing import Dict
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
 
-# Load environment variables
 load_dotenv()
 
 
 class LLMService:
-    """Service for formatting responses using LLM"""
-    
     def __init__(self):
         api_key = os.getenv("OPENAI_API_KEY")
         if api_key:
@@ -26,18 +18,7 @@ class LLMService:
             print("Warning: OPENAI_API_KEY not set. LLM formatting disabled.")
     
     def format_prize_response(self, suggestion: Dict, query_context: Dict) -> str:
-        """
-        Format prize allocation suggestion into human-readable response
-        
-        Args:
-            suggestion: Anonymized suggestion dictionary
-            query_context: Context from query (theme, amount, etc.)
-            
-        Returns:
-            Formatted human-readable response
-        """
         if not self.enabled:
-            # Fallback formatting without LLM
             return self._fallback_format_prize(suggestion, query_context)
         
         try:
@@ -59,7 +40,7 @@ Write a concise, helpful response (2-3 sentences) that:
 Keep it conversational and friendly."""
             
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini",  # Using gpt-4o-mini as GPT-5 is not available
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are a helpful hackathon planning assistant. Format responses in a friendly, conversational tone."},
                     {"role": "user", "content": prompt}
@@ -74,7 +55,6 @@ Keep it conversational and friendly."""
             return self._fallback_format_prize(suggestion, query_context)
     
     def _fallback_format_prize(self, suggestion: Dict, query_context: Dict) -> str:
-        """Fallback formatting when LLM is not available"""
         theme = query_context.get("theme", "similar")
         amount = suggestion["suggestion"]["total"]
         first = suggestion["suggestion"]["first"]
@@ -86,16 +66,6 @@ Keep it conversational and friendly."""
         return response
     
     def format_general_response(self, data: Dict, query_type: str) -> str:
-        """
-        Format general responses based on query type
-        
-        Args:
-            data: Retrieved data
-            query_type: Type of query (challenge, judge, timeline, etc.)
-            
-        Returns:
-            Formatted response
-        """
         if not self.enabled:
             return self._fallback_format_general(data, query_type)
         
@@ -123,9 +93,7 @@ Write a concise, friendly response that helps the user understand the informatio
             return self._fallback_format_general(data, query_type)
     
     def _fallback_format_general(self, data: Dict, query_type: str) -> str:
-        """Fallback formatting for general responses"""
         return f"Here's what I found for {query_type} based on similar hackathons. Want more details?"
 
 
-# Global LLM service instance
 llm_service = LLMService()

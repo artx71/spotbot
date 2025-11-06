@@ -1,9 +1,3 @@
-"""
-Chat Service for SpotBot MVP
-Processes user messages and generates responses using RAG data
-Handles hackathon creation through conversation
-"""
-
 from typing import List, Dict, Optional
 from rag_service import rag_service
 from agent_kit import agent_kit
@@ -14,15 +8,11 @@ from datetime import datetime
 
 
 class ChatService:
-    """Handles conversation flow and response generation"""
-    
     def __init__(self):
         self.conversation_history: Dict[str, List[Dict]] = {}
-        self.hackathon_drafts: Dict[str, Dict] = {}  # Track hackathon creation state per user
+        self.hackathon_drafts: Dict[str, Dict] = {}
     
     def _extract_number(self, text: str) -> Optional[float]:
-        """Extract dollar amount from text"""
-        # Remove commas and find dollar amounts
         amounts = re.findall(r'\$?(\d+(?:,\d{3})*(?:\.\d{2})?)', text.replace(',', ''))
         if amounts:
             try:
@@ -32,7 +22,6 @@ class ChatService:
         return None
     
     def _extract_hackathon_info(self, query: str, user_id: str) -> Dict:
-        """Extract hackathon information from user query and update draft"""
         query_lower = query.lower()
         
         if user_id not in self.hackathon_drafts:
@@ -50,30 +39,28 @@ class ChatService:
         draft = self.hackathon_drafts[user_id]
         updated = False
         
-        # Extract theme
+        theme_map = {
+            "ai": "Artificial Intelligence",
+            "artificial intelligence": "Artificial Intelligence",
+            "climate": "Climate & Sustainability",
+            "healthcare": "Healthcare & Medical",
+            "medical": "Healthcare & Medical",
+            "fintech": "Financial Technology",
+            "financial": "Financial Technology",
+            "education": "Education Technology",
+            "edtech": "Education Technology",
+            "sustainability": "Climate & Sustainability"
+        }
+        
         themes = ["ai", "artificial intelligence", "climate", "healthcare", "fintech", 
                   "education", "edtech", "sustainability", "medical", "financial"]
         for theme in themes:
             if theme in query_lower:
-                # Map to full theme name
-                theme_map = {
-                    "ai": "Artificial Intelligence",
-                    "artificial intelligence": "Artificial Intelligence",
-                    "climate": "Climate & Sustainability",
-                    "healthcare": "Healthcare & Medical",
-                    "medical": "Healthcare & Medical",
-                    "fintech": "Financial Technology",
-                    "financial": "Financial Technology",
-                    "education": "Education Technology",
-                    "edtech": "Education Technology",
-                    "sustainability": "Climate & Sustainability"
-                }
                 draft["theme"] = theme_map.get(theme, theme.title())
                 updated = True
+                break
         
-        # Extract title (if user explicitly mentions a title)
         if any(word in query_lower for word in ["title", "called", "name it", "name is"]):
-            # Try to extract title after keywords
             title_patterns = [
                 r"(?:title|called|name it|name is)[:\s]+(.+?)(?:\.|$)",
                 r"i want (?:to|a) (?:create|make|organize) (?:a|an) (.+?)(?: hackathon|$)",
@@ -85,14 +72,11 @@ class ChatService:
                     updated = True
                     break
         
-        # Extract description
         if len(query) > 20 and not any(word in query_lower for word in ["prize", "challenge", "judge", "timeline", "theme", "title"]):
-            # Likely a description
             if not draft["description"]:
                 draft["description"] = query
                 updated = True
         
-        # Extract prize amount
         prize_amount = self._extract_number(query)
         if prize_amount:
             recommendation = rag_service.get_prize_recommendation(prize_amount)
@@ -104,7 +88,6 @@ class ChatService:
             }
             updated = True
         
-        # Extract duration
         if any(word in query_lower for word in ["timeline", "duration", "days", "how long"]):
             hack_type = "standard"
             if "sprint" in query_lower or "24" in query_lower:
@@ -121,16 +104,11 @@ class ChatService:
         return draft, updated
     
     def _generate_response(self, query: str, user_id: str, context: Dict = None) -> tuple:
-        """Generate response based on query and RAG context. Returns (response, hackathon_data)"""
         query_lower = query.lower().strip()
         response_parts = []
         hackathon_data = None
-        
-        # Get current draft if exists
         draft = self.hackathon_drafts.get(user_id, {})
         
-        # Handle standalone configuration commands
-        # Check if query starts with configuration command
         is_config_command = (
             query_lower in ["prize pool", "prize", "prizes", "prize allocation"] or
             query_lower.startswith("prize pool") or
@@ -138,16 +116,13 @@ class ChatService:
         )
         
         if is_config_command:
-            # Check if prize amount is mentioned in the query
             prize_amount = self._extract_number(query)
             
             if draft.get("theme"):
                 theme = draft["theme"]
                 current_prizes = draft.get("prizes", {})
                 
-                # If prize amount is provided, process it
                 if prize_amount:
-                    # Use the pipeline to get recommendation
                     query_params = agent_kit.extract_query_params(query)
                     query_params["theme"] = theme
                     query_params["prize_amount"] = prize_amount
@@ -156,12 +131,17 @@ class ChatService:
                         prize_amount, theme
                     )
                     
-                    recommendation = None
                     if anonymized_suggestion:
                         formatted_response = llm_service.format_prize_response(
                             anonymized_suggestion, query_params
                         )
                         response_parts.append(formatted_response)
+                        draft["prizes"] = {
+                            "total": f"${prize_amount:,.0f}",
+                            "first": f"${anonymized_suggestion['suggestion']['first']:,.0f}",
+                            "second": f"${anonymized_suggestion['suggestion']['second']:,.0f}",
+                            "third": f"${anonymized_suggestion['suggestion']['third']:,.0f}"
+                        }
                     else:
                         recommendation = rag_service.get_prize_recommendation(prize_amount)
                         response_parts.append(
@@ -171,16 +151,6 @@ class ChatService:
                             f"• 2nd Place: ${recommendation['second']:,.0f} ({recommendation['ratios']['second']*100:.0f}%)\n"
                             f"• 3rd Place: ${recommendation['third']:,.0f} ({recommendation['ratios']['third']*100:.0f}%)"
                         )
-                    
-                    # Update draft
-                    if anonymized_suggestion:
-                        draft["prizes"] = {
-                            "total": f"${prize_amount:,.0f}",
-                            "first": f"${anonymized_suggestion['suggestion']['first']:,.0f}",
-                            "second": f"${anonymized_suggestion['suggestion']['second']:,.0f}",
-                            "third": f"${anonymized_suggestion['suggestion']['third']:,.0f}"
-                        }
-                    elif recommendation:
                         draft["prizes"] = {
                             "total": f"${prize_amount:,.0f}",
                             "first": f"${recommendation['first']:,.0f}",
@@ -202,7 +172,6 @@ class ChatService:
                     response_parts.append("\nOr I can suggest an allocation based on similar hackathons. Just tell me the total amount!")
             else:
                 if prize_amount:
-                    # User provided prize amount but no theme - prompt for theme
                     response_parts.append(f"Great! I see you want a ${prize_amount:,.0f} prize pool.")
                     response_parts.append("\nWhat theme is your hackathon? (e.g., AI, Healthcare, Climate)")
                     response_parts.append("Then I can suggest the best allocation based on similar hackathons.")
@@ -212,11 +181,9 @@ class ChatService:
                     response_parts.append("Then we can configure the prize allocation.")
             return "\n".join(response_parts), hackathon_data
         
-        # Check if query starts with challenges command
         is_challenges_command = (
             query_lower in ["challenges", "challenge", "tracks", "track", "categories", "category"] or
-            query_lower.startswith("challenge") or
-            query_lower.startswith("challenges")
+            query_lower.startswith("challenge")
         )
         
         if is_challenges_command:
@@ -227,7 +194,6 @@ class ChatService:
                 for i, challenge in enumerate(challenges, 1):
                     response_parts.append(f"{i}. {challenge}")
                 response_parts.append(f"\nWould you like to use these, or tell me about specific challenges you have in mind?")
-                # Update draft with suggested challenges
                 draft["challenges"] = challenges
                 self.hackathon_drafts[user_id] = draft
             else:
@@ -236,11 +202,9 @@ class ChatService:
                 response_parts.append("Then I can suggest relevant challenges based on similar successful hackathons.")
             return "\n".join(response_parts), hackathon_data
         
-        # Check if query starts with judges command
         is_judges_command = (
             query_lower in ["judges", "judge", "mentors", "mentor", "evaluators", "evaluator"] or
-            query_lower.startswith("judge") or
-            query_lower.startswith("judges")
+            query_lower.startswith("judge")
         )
         
         if is_judges_command:
@@ -251,7 +215,6 @@ class ChatService:
                 for judge in judges:
                     response_parts.append(f"• {judge}")
                 response_parts.append(f"\nWould you like to use these suggestions, or tell me about specific judges you have in mind?")
-                # Update draft with suggested judges
                 draft["judges"] = judges
                 self.hackathon_drafts[user_id] = draft
             else:
@@ -260,7 +223,6 @@ class ChatService:
                 response_parts.append("Then I can suggest relevant judges based on similar successful hackathons.")
             return "\n".join(response_parts), hackathon_data
         
-        # Check if query starts with timeline command
         is_timeline_command = (
             query_lower in ["timeline", "duration", "schedule", "how long", "days"] or
             query_lower.startswith("timeline") or
@@ -274,8 +236,6 @@ class ChatService:
                 current_duration = draft.get("duration_days", 48)
                 response_parts.append(f"Current timeline for your {theme} hackathon:")
                 response_parts.append(f"**Duration:** {current_duration} days")
-                
-                recommendation = rag_service.get_timeline_recommendation("standard")
                 response_parts.append(f"\nWhat duration would you like?")
                 response_parts.append("• 24 hours (Sprint)")
                 response_parts.append("• 48 hours (Standard)")
@@ -288,31 +248,20 @@ class ChatService:
                 response_parts.append("Then I can suggest an appropriate duration based on similar hackathons.")
             return "\n".join(response_parts), hackathon_data
         
-        # Check if user wants to create hackathon
         if any(phrase in query_lower for phrase in ["create", "make", "build", "set up", "organize", "ready to create", "generate"]):
             draft, updated = self._extract_hackathon_info(query, user_id)
             
-            # Check if we have enough info to create
-            required_fields = ["theme"]
-            if any(field and draft.get(field) for field in required_fields):
-                # Generate a title if not provided
+            if draft.get("theme"):
                 if not draft["title"]:
                     draft["title"] = f"{draft['theme']} Hackathon 2025"
                 
-                # Generate description if not provided
                 if not draft["description"]:
                     similar = rag_service.search_hackathons(draft["theme"], limit=1)
-                    if similar:
-                        draft["description"] = similar[0].get("description", f"Build innovative solutions for {draft['theme']}")
-                    else:
-                        draft["description"] = f"Build innovative solutions for {draft['theme']}"
+                    draft["description"] = similar[0].get("description", f"Build innovative solutions for {draft['theme']}") if similar else f"Build innovative solutions for {draft['theme']}"
                 
-                # Suggest challenges if not provided
                 if not draft["challenges"]:
-                    challenges = rag_service.get_similar_challenges(draft["theme"], limit=4)
-                    draft["challenges"] = challenges
+                    draft["challenges"] = rag_service.get_similar_challenges(draft["theme"], limit=4)
                 
-                # Suggest prizes if not provided
                 if not draft["prizes"]:
                     draft["prizes"] = {
                         "total": "$20,000",
@@ -321,10 +270,8 @@ class ChatService:
                         "third": "$2,000"
                     }
                 
-                # Suggest judges if not provided
                 if not draft["judges"]:
-                    judges = rag_service.get_similar_judges(draft["theme"], limit=4)
-                    draft["judges"] = judges
+                    draft["judges"] = rag_service.get_similar_judges(draft["theme"], limit=4)
                 
                 hackathon_data = draft.copy()
                 response_parts.append("Great! I've prepared your hackathon configuration. Here's what I've set up:\n")
@@ -346,28 +293,19 @@ class ChatService:
                 response_parts.append("• What's the prize pool amount? (optional)")
                 response_parts.append("• How long should the hackathon be? (e.g., 24 hours, 48 hours, 72 hours)")
         
-        # Prize allocation queries - Use new pipeline
         elif any(word in query_lower for word in ["prize", "prizes", "reward", "money", "allocation"]):
-            # Pipeline: AgentKit → RAG → Anonymization → LLM
             if agent_kit.is_proprietary_query(query):
                 query_params = agent_kit.extract_query_params(query)
                 prize_amount = query_params.get("prize_amount") or self._extract_number(query)
                 
                 if prize_amount:
-                    # Retrieve from RAG vector store (prize_recommendations.json)
                     theme = query_params.get("theme")
-                    anonymized_suggestion = anonymization_service.get_anonymized_prize_suggestion(
-                        prize_amount, theme
-                    )
+                    anonymized_suggestion = anonymization_service.get_anonymized_prize_suggestion(prize_amount, theme)
                     
                     if anonymized_suggestion:
-                        # Format with LLM
-                        formatted_response = llm_service.format_prize_response(
-                            anonymized_suggestion, query_params
-                        )
+                        formatted_response = llm_service.format_prize_response(anonymized_suggestion, query_params)
                         response_parts.append(formatted_response)
                     else:
-                        # Fallback to RAG service
                         recommendation = rag_service.get_prize_recommendation(prize_amount)
                         response_parts.append(
                             f"Based on similar hackathons with a ${prize_amount:,.0f} prize pool, "
@@ -377,10 +315,8 @@ class ChatService:
                             f"• 3rd Place: ${recommendation['third']:,.0f} ({recommendation['ratios']['third']*100:.0f}%)"
                         )
                     
-                    # Update draft
                     draft, _ = self._extract_hackathon_info(query, user_id)
                 else:
-                    # Show examples from similar hackathons
                     similar = rag_service.search_hackathons(query, limit=2)
                     if similar:
                         response_parts.append("Here are prize examples from similar hackathons:")
@@ -391,7 +327,6 @@ class ChatService:
                                 f"({prizes.get('first', 'N/A')} / {prizes.get('second', 'N/A')} / {prizes.get('third', 'N/A')})"
                             )
             else:
-                # Non-proprietary query - handle normally
                 prize_amount = self._extract_number(query)
                 if prize_amount:
                     recommendation = rag_service.get_prize_recommendation(prize_amount)
@@ -402,9 +337,7 @@ class ChatService:
                         f"• 3rd Place: ${recommendation['third']:,.0f}"
                     )
         
-        # Challenge/track queries
         elif any(word in query_lower for word in ["challenge", "challenges", "track", "category", "categories"]):
-            # Extract theme if mentioned
             theme = None
             for hack in rag_service.hackathons:
                 if hack["theme"].lower() in query_lower:
@@ -416,7 +349,6 @@ class ChatService:
                 response_parts.append(f"For {theme} hackathons, popular challenges include:")
                 for i, challenge in enumerate(challenges, 1):
                     response_parts.append(f"{i}. {challenge}")
-                # Update draft
                 draft, _ = self._extract_hackathon_info(query, user_id)
                 draft["challenges"] = challenges
             else:
@@ -428,7 +360,6 @@ class ChatService:
                         for challenge in hack.get("challenges", [])[:3]:
                             response_parts.append(f"• {challenge}")
         
-        # Theme/title queries - start creation flow
         elif any(word in query_lower for word in ["theme", "title", "idea", "topic", "what kind", "want to", "interested in"]):
             draft, updated = self._extract_hackathon_info(query, user_id)
             similar = rag_service.search_hackathons(query, limit=3)
@@ -455,11 +386,9 @@ class ChatService:
                 response_parts.append("• What's your prize pool? (optional)")
                 response_parts.append("• How many days? (e.g., 24, 48, 72)")
         
-        # General help
         else:
             draft, _ = self._extract_hackathon_info(query, user_id)
             
-            # Check if we're building a hackathon
             if draft.get("theme"):
                 response_parts.append(f"Great! I see you're working on a {draft['theme']} hackathon.")
                 response_parts.append("\nWhat would you like to configure next?")
@@ -481,21 +410,16 @@ class ChatService:
         return "\n".join(response_parts) if response_parts else "I'm here to help! Can you tell me more about what you're planning?", hackathon_data
     
     def process_message(self, user_id: str, message: str) -> Dict:
-        """Process a user message and return bot response"""
-        # Initialize conversation history for new users
         if user_id not in self.conversation_history:
             self.conversation_history[user_id] = []
         
-        # Add user message to history
         self.conversation_history[user_id].append({
             "role": "user",
             "content": message
         })
         
-        # Generate response using RAG
         response, hackathon_data = self._generate_response(message, user_id)
         
-        # Add bot response to history
         self.conversation_history[user_id].append({
             "role": "assistant",
             "content": response
@@ -506,30 +430,24 @@ class ChatService:
             "history": self.conversation_history[user_id]
         }
         
-        # Include hackathon data if ready
         if hackathon_data:
             result["hackathon_data"] = hackathon_data
         
         return result
     
     def get_conversation_history(self, user_id: str) -> List[Dict]:
-        """Get conversation history for a user"""
         return self.conversation_history.get(user_id, [])
     
     def clear_conversation(self, user_id: str):
-        """Clear conversation history for a user"""
         if user_id in self.conversation_history:
             del self.conversation_history[user_id]
         if user_id in self.hackathon_drafts:
             del self.hackathon_drafts[user_id]
     
     def get_hackathon_draft(self, user_id: str) -> Optional[Dict]:
-        """Get current hackathon draft for a user"""
         return self.hackathon_drafts.get(user_id)
     
     def create_hackathon(self, user_id: str, hackathon_data: Dict) -> Dict:
-        """Create a hackathon from draft data"""
-        # Generate ID and timestamp
         hackathon_id = len(self.hackathon_drafts) + 1
         
         hackathon = {
@@ -546,12 +464,7 @@ class ChatService:
             "status": "draft"
         }
         
-        # Store created hackathon (in production, this would go to a database)
-        if user_id not in self.hackathon_drafts:
-            self.hackathon_drafts[user_id] = {}
-        
         return hackathon
 
 
-# Global chat service instance
 chat_service = ChatService()

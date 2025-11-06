@@ -1,22 +1,14 @@
-"""
-Anonymization Service
-Generates anonymized suggestions from proprietary data
-"""
-
 from typing import List, Dict, Optional
 import json
 import os
 
 
 class AnonymizationService:
-    """Service for generating anonymized suggestions from proprietary data"""
-    
     def __init__(self):
         self.data_dir = os.path.join(os.path.dirname(__file__), "data")
         self.prize_recommendations = self._load_prize_recommendations()
     
     def _load_prize_recommendations(self) -> List[Dict]:
-        """Load prize recommendations from JSON file"""
         try:
             file_path = os.path.join(self.data_dir, "prize_recommendations.json")
             if os.path.exists(file_path):
@@ -28,37 +20,20 @@ class AnonymizationService:
         return []
     
     def get_anonymized_prize_suggestion(self, prize_amount: float, theme: Optional[str] = None) -> Optional[Dict]:
-        """
-        Get anonymized prize suggestion based on amount and theme
-        
-        Args:
-            prize_amount: Total prize pool amount
-            theme: Optional theme filter
-            
-        Returns:
-            Anonymized suggestion dictionary or None
-        """
-        # Find matching recommendations
         matching_recs = []
         
         for rec in self.prize_recommendations:
-            # Check prize pool range
             range_str = rec.get("prize_pool_range", "")
             if "-" in range_str:
                 min_val, max_val = map(int, range_str.split("-"))
                 if min_val <= prize_amount <= max_val:
-                    # Check theme match if provided
                     if theme is None or rec.get("theme") == theme:
                         matching_recs.append(rec)
         
         if not matching_recs:
-            # Fallback: use ratio-based calculation
             return self._generate_ratio_based_suggestion(prize_amount)
         
-        # Use the first matching recommendation
         best_match = matching_recs[0]
-        
-        # Anonymize the suggestion
         return {
             "suggestion": {
                 "first": best_match["allocations"]["first"],
@@ -75,7 +50,6 @@ class AnonymizationService:
         }
     
     def _generate_ratio_based_suggestion(self, prize_amount: float) -> Dict:
-        """Generate suggestion using ratio-based approach"""
         if prize_amount < 15000:
             category = "small"
             ratios = {"first": 0.60, "second": 0.30, "third": 0.10}
@@ -102,15 +76,6 @@ class AnonymizationService:
         }
     
     def anonymize_hackathon_data(self, hackathon_data: Dict) -> Dict:
-        """
-        Anonymize hackathon data for suggestions
-        
-        Args:
-            hackathon_data: Raw hackathon data
-            
-        Returns:
-            Anonymized version
-        """
         anonymized = {
             "theme": hackathon_data.get("theme", "Unknown"),
             "prizes": {
@@ -121,12 +86,10 @@ class AnonymizationService:
             "participants": "Similar scale"
         }
         
-        # Remove identifying information
         if "title" in hackathon_data:
             anonymized["anonymized_title"] = f"{hackathon_data['theme']} Hackathon"
         
         return anonymized
 
 
-# Global anonymization service instance
 anonymization_service = AnonymizationService()
