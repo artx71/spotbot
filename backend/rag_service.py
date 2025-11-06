@@ -84,7 +84,24 @@ class RAGService:
         scored_hackathons.sort(key=lambda x: x[0], reverse=True)
         return [hackathon for _, hackathon in scored_hackathons[:limit]]
     
-    def get_prize_recommendation(self, total_prize: float) -> Dict:
+    def get_prize_recommendation(self, total_prize: float, theme: Optional[str] = None) -> Dict:
+        if theme:
+            theme_lower = theme.lower()
+            for embedding in self.approved_embeddings:
+                emb_theme = embedding.get("metadata", {}).get("theme", "").lower()
+                if emb_theme and (emb_theme in theme_lower or theme_lower in emb_theme):
+                    ratios = embedding.get("metadata", {}).get("prize_allocation_ratios")
+                    if ratios:
+                        return {
+                            "category": "learned",
+                            "first": total_prize * ratios["first"],
+                            "second": total_prize * ratios["second"],
+                            "third": total_prize * ratios["third"],
+                            "ratios": ratios,
+                            "source": "learned",
+                            "theme": embedding.get("metadata", {}).get("theme")
+                        }
+        
         if total_prize < 15000:
             category = "small"
         elif total_prize < 30000:
@@ -98,7 +115,8 @@ class RAGService:
             "first": total_prize * ratios["first"],
             "second": total_prize * ratios["second"],
             "third": total_prize * ratios["third"],
-            "ratios": ratios
+            "ratios": ratios,
+            "source": "default"
         }
     
     def get_timeline_recommendation(self, hackathon_type: str = "standard") -> Dict:

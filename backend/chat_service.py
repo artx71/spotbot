@@ -79,7 +79,8 @@ class ChatService:
         
         prize_amount = self._extract_number(query)
         if prize_amount:
-            recommendation = rag_service.get_prize_recommendation(prize_amount)
+            theme = draft.get("theme")
+            recommendation = rag_service.get_prize_recommendation(prize_amount, theme)
             draft["prizes"] = {
                 "total": f"${prize_amount:,.0f}",
                 "first": f"${recommendation['first']:,.0f}",
@@ -143,9 +144,10 @@ class ChatService:
                             "third": f"${anonymized_suggestion['suggestion']['third']:,.0f}"
                         }
                     else:
-                        recommendation = rag_service.get_prize_recommendation(prize_amount)
+                        recommendation = rag_service.get_prize_recommendation(prize_amount, theme)
+                        source_msg = f" (learned from {recommendation.get('theme', 'similar')} hackathons)" if recommendation.get('source') == 'learned' else ""
                         response_parts.append(
-                            f"Based on similar hackathons with a ${prize_amount:,.0f} prize pool, "
+                            f"Based on similar hackathons{source_msg} with a ${prize_amount:,.0f} prize pool, "
                             f"I recommend:\n"
                             f"• 1st Place: ${recommendation['first']:,.0f} ({recommendation['ratios']['first']*100:.0f}%)\n"
                             f"• 2nd Place: ${recommendation['second']:,.0f} ({recommendation['ratios']['second']*100:.0f}%)\n"
@@ -299,16 +301,17 @@ class ChatService:
                 prize_amount = query_params.get("prize_amount") or self._extract_number(query)
                 
                 if prize_amount:
-                    theme = query_params.get("theme")
+                    theme = query_params.get("theme") or draft.get("theme")
                     anonymized_suggestion = anonymization_service.get_anonymized_prize_suggestion(prize_amount, theme)
                     
                     if anonymized_suggestion:
                         formatted_response = llm_service.format_prize_response(anonymized_suggestion, query_params)
                         response_parts.append(formatted_response)
                     else:
-                        recommendation = rag_service.get_prize_recommendation(prize_amount)
+                        recommendation = rag_service.get_prize_recommendation(prize_amount, theme)
+                        source_msg = f" (learned from {recommendation.get('theme', 'similar')} hackathons)" if recommendation.get('source') == 'learned' else ""
                         response_parts.append(
-                            f"Based on similar hackathons with a ${prize_amount:,.0f} prize pool, "
+                            f"Based on similar hackathons{source_msg} with a ${prize_amount:,.0f} prize pool, "
                             f"I recommend:\n"
                             f"• 1st Place: ${recommendation['first']:,.0f} ({recommendation['ratios']['first']*100:.0f}%)\n"
                             f"• 2nd Place: ${recommendation['second']:,.0f} ({recommendation['ratios']['second']*100:.0f}%)\n"
@@ -329,9 +332,11 @@ class ChatService:
             else:
                 prize_amount = self._extract_number(query)
                 if prize_amount:
-                    recommendation = rag_service.get_prize_recommendation(prize_amount)
+                    theme = draft.get("theme")
+                    recommendation = rag_service.get_prize_recommendation(prize_amount, theme)
+                    source_msg = f" (learned from {recommendation.get('theme', 'similar')} hackathons)" if recommendation.get('source') == 'learned' else ""
                     response_parts.append(
-                        f"For a ${prize_amount:,.0f} prize pool, I recommend:\n"
+                        f"For a ${prize_amount:,.0f} prize pool{source_msg}, I recommend:\n"
                         f"• 1st Place: ${recommendation['first']:,.0f}\n"
                         f"• 2nd Place: ${recommendation['second']:,.0f}\n"
                         f"• 3rd Place: ${recommendation['third']:,.0f}"

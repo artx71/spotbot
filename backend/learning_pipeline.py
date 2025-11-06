@@ -140,6 +140,20 @@ class LearningPipeline:
     def create_embeddings(self, summaries: List[Dict]) -> List[Dict]:
         embeddings = []
         for summary in summaries:
+            allocation_pattern = summary.get("recommended_prize_allocation", "")
+            allocation_ratios = None
+            if allocation_pattern:
+                try:
+                    parts = allocation_pattern.split("-")
+                    if len(parts) == 3:
+                        allocation_ratios = {
+                            "first": float(parts[0]),
+                            "second": float(parts[1]),
+                            "third": float(parts[2])
+                        }
+                except (ValueError, IndexError):
+                    pass
+            
             embedding = {
                 "id": f"embedding_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(embeddings)}",
                 "content": self._summary_to_text(summary),
@@ -148,6 +162,8 @@ class LearningPipeline:
                     "type": summary.get("type"),
                     "sample_size": summary.get("sample_size"),
                     "aggregated_at": summary.get("aggregated_at"),
+                    "prize_allocation_ratios": allocation_ratios,
+                    "avg_prize_total": summary.get("avg_prize_total"),
                     "status": "pending_approval"
                 },
                 "embedding_vector": None
